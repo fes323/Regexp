@@ -1,58 +1,90 @@
-from pprint import pprint
+#from pprint import pprint
 import csv
 import re
 
-with open("phonebook_raw.csv", encoding="utf-8") as f:
-  rows = csv.reader(f, delimiter=",")
-  contacts_list = list(rows)
-#pprint(contacts_list)
 
-my_dict = {}
-my_list = []
-new_dict = {}
-new_list = []
+class PhoneBook():
 
-for row in contacts_list:
+  def __init__(self, file_name):
+    self.file_name = file_name
+    self.contact_list = self.read()
+    self.phone_list = self.find_phone()
+    self.create_list = self.create_list()
+    self.result_list = self.merge_list()
 
-    fullname = ' '.join(row[0:3]).split()  # ФИО
-    organization = ''.join(row[3])  # организция
-    position = ''.join(row[4])  # Должность
-    phone = re.sub(
-        r'(\+7|8)(\s+)?(\()?(\d{3})(\))?[-\s+]?(\d{3})[-\s+]?(\d{2})[-\s+]?(\d{2})?([^а-яА-яa-zA-Z,\n])?(\()?(доб.)?\s?(\d+)?(\))?',
-        r'+7(\4)\6-\7-\8 \11\12', row[5])
-    email = ''.join(row[6])  # Почта
+  def read(self):
+    with open(self.file_name, encoding="utf-8") as f:
+      rows = csv.reader(f, delimiter=",")
+      contacts_list = list(rows)
+    return contacts_list
 
-    if len(fullname) == 3:  # Проверка наличия отчества (если есть, то добавляем)
-        lastname = fullname[0]
-        firstname = fullname[1]
-        surname = fullname[2]
-    if len(fullname) == 2:  # Проверка наличия отчества (при отсутсвии отчества не добавляем)
-        lastname = fullname[0]
-        firstname = fullname[1]
-    if len(fullname) == 1:
-        lastname = fullname[0]
-    else:
-        pass
+  def find_phone(self):
+    phone_list = []
+    for contact in self.contact_list:
+      contact[5] = re.sub(r'(\+7|8)(\s+)?(\()?(\d{3})(\))?[-\s+]?(\d{3})[-\s+]?(\d{2})[-\s+]?(\d{2})?([^а-яА-яa-zA-Z,\n])?(\()?(доб.)?\s?(\d+)?(\))?', r'+7(\4)\6-\7-\8 \11\12', contact[5])
+      phone_list.append(contact)
+    return phone_list
 
-    if lastname not in my_dict.values():  # Проверка на дубликаты по совпадению
-        my_dict = ({
-            'lastname': lastname,
-            'firstname': firstname,
-            'surname': surname,
-            'organization': organization,
-            'position': position,
-            'phone': phone,
-            'email': email,
-        })
+  def create_list(self):
 
-        my_list.append(
-            my_dict.values()
-        )
-    else:
-        pass
+    my_list = []
+    my_dict = {
+      "lastname": '', "firstname": '', 'surname': '', 'organization': '', 'position': '', 'phone': '', 'email': ''
+    }
+
+    for contact in self.phone_list:
+
+      if len(contact[1].split()) >= 2:
+        my_dict['lastname'] = contact[0]
+        my_dict['firstname'] = contact[1].split()[0]
+        my_dict['surname'] = contact[1].split()[1]
+      elif len(contact[0].split()) == 1:
+        my_dict['lastname'] = contact[0]
+        my_dict['firstname'] = contact[1]
+        my_dict['surname'] = contact[2]
+      elif len(contact[0].split()) >= 2:
+        my_dict['lastname'] = contact[0].split()[0]
+        my_dict['firstname'] = contact[0].split()[1]
+        try:
+          my_dict['surname'] = contact[0].split()[2]
+        except:
+          my_dict['surname'] = contact[1]
+
+      my_dict['organization'] = contact[3]
+      my_dict['position'] = contact[4]
+      my_dict['phone'] = contact[5]
+      my_dict['email'] = contact[6]
+
+      my_list.append(list(my_dict.values()))
+
+      my_dict = {
+        "lastname": '', "firstname": '', 'surname': '', 'organization': '', 'position': '', 'phone': '', 'email': '',
+      }
+
+    return my_list
+
+  def merge_list(self):
+    # Честно найдено в интернете. Поиск - одно из самых важных умений (с)
+    final_list = self.create_list
+    N = len(self.create_list) + 1
+    del_index = []
+    for i in range(N - 1):
+      for search in range(i + 1, N - 1):
+        if final_list[i][0] == final_list[search][0] and final_list[i][1] == final_list[search][1]:
+          for value in range(7):
+            if final_list[i][value] == '':
+              final_list[i][value] = final_list[search][value]
+          del_index.append(search)
+    for i in reversed(del_index):
+      del final_list[i]
+    return final_list
+
+  def write(self):
+    with open("phonebook.csv", "w", encoding="utf-8") as f:
+      datawriter = csv.writer(f, delimiter=',')
+      datawriter.writerows(self.result_list)
 
 
-with open("phonebook.csv", "w", encoding="utf-8") as f:
-  datawriter = csv.writer(f, delimiter=',')
-  # Вместо contacts_list подставьте свой список
-  datawriter.writerows(my_list)
+file_name = "phonebook_raw.csv"
+phone = PhoneBook(file_name)
+phone.write()
